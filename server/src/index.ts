@@ -30,12 +30,15 @@ app.post('/api/ai-move', async (req, res) => {
       }
     }
 
-    // 告诉 AI 的提示词
-    const prompt = `你是六子棋AI。棋盘是15x15，坐标从(0,0)到(14,14)。
+        // 告诉 AI 的提示词（修改版：要求返回两步）
+    const prompt = `你是六子棋AI。六子棋规则是：黑棋先走1子，之后双方每次必须走2子。棋盘是15x15，坐标从(0,0)到(14,14)。
 ${boardString}
-现在是 ${currentPlayer === 'black' ? '黑棋' : '白棋'} 回合，请给出你的落子坐标。
-必须且只能返回一个合法的空位坐标，严格以 JSON 格式返回，不要任何多余的解释。
-格式示例：{"row": 7, "col": 7}`;
+现在是 ${currentPlayer === 'black' ? '黑棋' : '白棋'} 回合。
+请给出你的落子坐标：
+1. 如果这是全局的第一步（黑棋第一手），只返回1个坐标。
+2. 如果是后续回合，必须返回2个合法的空位坐标。
+必须且只能严格以 JSON 数组格式返回，不要任何多余的解释。
+格式示例：[{"row": 7, "col": 7}, {"row": 8, "col": 8}]`;
 
     // 发送请求给 DeepSeek
     const response = await axios.post(
@@ -43,7 +46,7 @@ ${boardString}
       {
         model: 'deepseek-chat',
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1, // 温度设低一点，让它不要瞎编
+        temperature: 0.1,
       },
       {
         headers: {
@@ -57,14 +60,15 @@ ${boardString}
     const aiReply = response.data.choices[0].message.content;
     console.log("AI 原始回复:", aiReply);
     
-    // 从回复中提取 JSON 格式的坐标
-    const match = aiReply.match(/\{.*\}/s);
+    // 从回复中提取 JSON 数组格式的坐标
+    const match = aiReply.match(/\[.*\]/s); // 注意这里改成了匹配中括号 []
     if (match) {
-      const move = JSON.parse(match[0]);
-      res.json({ success: true, move });
+      const moves = JSON.parse(match[0]); // 解析成数组
+      res.json({ success: true, moves }); // 返回数组
     } else {
       res.status(500).json({ error: "AI 格式错误", raw: aiReply });
     }
+    
 
   } catch (error: any) {
     console.error("AI 接口报错:", error.message);
